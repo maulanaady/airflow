@@ -9,8 +9,8 @@ airflow:
   ## configs for the airflow container image
   ##
   image:
-    repository: apache/airflow
-    tag: 2.5.3-python3.8
+    repository: adysulton/psn
+    tag: airflow-v1-release
     pullPolicy: IfNotPresent
     pullSecret: ""
     uid: 50000
@@ -28,7 +28,7 @@ airflow:
   ## - use this command to generate your own fernet key:
   ##   python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)"
   ##
-  fernetKey: "7T512UXSSmBOkpWimFHIVb8jK6lfmSAvx4mO6Arehnc="
+  fernetKey: "no6dt7bk-yWKnZaHBGKMu9VXv--YMiIXPcRMigFyvUs="
 
   ## the secret_key for flask (sets `AIRFLOW__WEBSERVER__SECRET_KEY`)
   ## - [WARNING] you must change this value to ensure the security of your airflow
@@ -116,7 +116,14 @@ airflow:
   ##           "aws_secret_access_key": "${AWS_ACCESS_KEY}",
   ##           "region_name":"eu-central-1" }
   ##
-  connections: []
+  # connections: []
+  connections:
+    - id: analysis
+      type: MySQL
+      host: 192.168.41.95
+      login: cboss
+      password: cboss2018
+
 
   ## bash-like templates to be used in `airflow.connections`
   ## - see docs for `airflow.usersTemplates`
@@ -216,6 +223,7 @@ airflow:
   ##     - "SomeProject==1.0.0"
   ##
   extraPipPackages: []
+
 
   ## pip packages that are protected from upgrade/downgrade by `extraPipPackages`
   ## - [WARNING] Pods will fail to start if `extraPipPackages` would cause these packages to change versions
@@ -588,7 +596,7 @@ scheduler:
     ## if the log-cleanup sidecar is enabled
     ## - [WARNING] must be disabled if `logs.persistence.enabled` is `true`
     ##
-    enabled: true
+    enabled: false
 
     ## resource requests/limits for the log-cleanup container
     ## - spec of ResourceRequirements:
@@ -843,13 +851,16 @@ workers:
   ## - if you set this >1 we recommend defining a `workers.podDisruptionBudget`
   ## - this is the minimum when `workers.autoscaling.enabled` is true
   ##
-  replicas: 1
+  replicas: 3
 
   ## resource requests/limits for the worker Pod
   ## - spec for ResourceRequirements:
   ##   https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
   ##
-  resources: {}
+  resources: #{}
+    requests:
+      cpu: 4000m
+      memory: 4Gi
 
   ## the nodeSelector configs for the worker Pods
   ## - docs for nodeSelector:
@@ -976,7 +987,7 @@ workers:
     ## if the log-cleanup sidecar is enabled
     ## - [WARNING] must be disabled if `logs.persistence.enabled` is `true`
     ##
-    enabled: true
+    enabled: false
 
     ## resource requests/limits for the log-cleanup container
     ## - spec of ResourceRequirements:
@@ -1286,11 +1297,11 @@ logs:
   persistence:
     ## if a persistent volume is mounted at `logs.path`
     ##
-    enabled: false
+    enabled: true
 
     ## the name of an existing PVC to use
     ##
-    existingClaim: ""
+    existingClaim: "airflow-logs-pvc"
 
     ## sub-path under `logs.persistence.existingClaim` to use
     ##
@@ -1300,7 +1311,7 @@ logs:
     ## - if set to "", then `PersistentVolumeClaim/spec.storageClassName` is omitted
     ## - if set to "-", then `PersistentVolumeClaim/spec.storageClassName` is set to ""
     ##
-    storageClass: "airflow-sc"
+    storageClass: "manual"
 
     ## the access mode of the PVC
     ## - [WARNING] must be "ReadWriteMany" or airflow pods will fail to start
@@ -1324,11 +1335,11 @@ dags:
   persistence:
     ## if a persistent volume is mounted at `dags.path`
     ##
-    enabled: false
+    enabled: true
 
     ## the name of an existing PVC to use
     ##
-    existingClaim: ""
+    existingClaim: "airflow-dags-pvc"
 
     ## sub-path under `dags.persistence.existingClaim` to use
     ##
@@ -1338,7 +1349,7 @@ dags:
     ## - if set to "", then `PersistentVolumeClaim/spec.storageClassName` is omitted
     ## - if set to "-", then `PersistentVolumeClaim/spec.storageClassName` is set to ""
     ##
-    storageClass: "airflow-sc"
+    storageClass: "manual"
 
     ## the access mode of the PVC
     ## - [WARNING] must be "ReadOnlyMany" or "ReadWriteMany" otherwise airflow pods will fail to start
@@ -1347,7 +1358,7 @@ dags:
 
     ## the size of PVC to request
     ##
-    size: 1Gi
+    size: 2Gi
 
   ## configs for the git-sync sidecar (https://github.com/kubernetes/git-sync)
   ##
@@ -1884,7 +1895,7 @@ postgresql:
   ## - [WARNING] consider using an external database with `externalDatabase.*`
   ## - set to `false` if using `externalDatabase.*`
   ##
-  enabled: true
+  enabled: false
 
   ## configs for the postgres container image
   ##
@@ -1920,7 +1931,7 @@ postgresql:
     ## if postgres will use Persistent Volume Claims to store data
     ## - [WARNING] if false, data will be LOST as postgres Pods restart
     ##
-    enabled: true
+    enabled: false
 
     ## the name of the StorageClass used by the PVC
     ##
@@ -1972,19 +1983,19 @@ externalDatabase:
 
   ## the host of the external database
   ##
-  host: localhost
+  host: 192.168.13.11
 
   ## the port of the external database
   ##
-  port: 5432
+  port: 30479
 
   ## the database/scheme to use within the external database
   ##
-  database: airflow
+  database: airflow_db
 
   ## the username for the external database
   ##
-  user: airflow
+  user: airflow_user
 
   ## the name of a pre-created secret containing the external database user
   ## - if set, this overrides `externalDatabase.user`
@@ -1999,7 +2010,7 @@ externalDatabase:
   ## - [WARNING] to avoid storing the password in plain-text within your values,
   ##   create a Kubernetes secret and use `externalDatabase.passwordSecret`
   ##
-  password: ""
+  password: "airflow_pass"
 
   ## the name of a pre-created secret containing the external database password
   ## - if set, this overrides `externalDatabase.password`
