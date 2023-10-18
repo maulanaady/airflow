@@ -1,0 +1,13 @@
+Id^User^Host^db^Command^Time^State^Query_id^Progress
+252313^cboss^192.168.13.55:41284^information_schema^Query^0^Filling schema table^66337007^0.000
+243502^cboss^192.168.68.122:62146^bb_bms^Sleep^1443^^66124088^0.000
+243501^cboss^192.168.68.122:62144^^Sleep^1540^^66108982^0.000
+243500^cboss^192.168.68.122:62143^^Sleep^1719^^66079821^0.000
+242519^cboss^192.168.41.191:52194^bb_customer^Sleep^5^^66336973^0.000
+39^cboss^192.168.41.124:42774^bb_customer^Sleep^6^^66336955^0.000
+7^event_scheduler^localhost^^Daemon^205204^Waiting for next activation^0^0.000
+5^system user^^^Daemon^0^InnoDB shutdown handler^0^0.000
+4^system user^^^Daemon^0^InnoDB purge worker^0^0.000
+1^system user^^^Daemon^0^InnoDB purge worker^0^0.000
+2^system user^^^Daemon^0^InnoDB purge worker^0^0.000
+3^system user^^^Daemon^0^InnoDB purge coordinator^0^0.000
