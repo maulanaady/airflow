@@ -249,4 +249,6 @@ with DAG(
     delete_files = delete_file.expand(conn_id=databases)
     telegram_notification = send_telegram(sshServer('ssh-analysis'))
 
-    start >> [telegram_notification, get_processlists] >> get_summaries >> send_pictures >> delete_files
+    start >> get_processlists >> get_summaries >> send_pictures >> delete_files
+    telegram_notification	
+	
