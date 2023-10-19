@@ -5,8 +5,8 @@ from airflow.operators.empty import EmptyOperator
 from airflow.datasets import Dataset
 from airflow.decorators import task
 import mysql.connector
-import logging,os,airflow
-from datetime import timedelta
+import logging,os,airflow, paramiko, requests
+from datetime import datetime, timedelta, time, date
 
 
 def dag_failure_alert(context):
@@ -22,6 +22,8 @@ def dag_failure_alert(context):
         token='6227308181:AAFCn2EMtAJsAq5ocOp2B39jAjubbVLX2R4', chat_id=1012087010)
     telegram_hook.send_message(message)
 
+   
+
 example_dataset = Dataset("//monitoring")
 
 with DAG(
@@ -35,7 +37,7 @@ with DAG(
 ) as dag:
     start = EmptyOperator(task_id='start')
 
-    @task
+    @task()
     def get_processlist(conn_id, **context):
         from mysql.connector import errorcode
         import csv
@@ -88,7 +90,7 @@ with DAG(
             else:
                 conn.close()
 
-    @task
+    @task()
     def get_summary(conn_id, **context):
         import numpy as np
         import pandas as pd
@@ -153,7 +155,7 @@ with DAG(
                         f"Monitoring Database {conn_id} Processlist per Command at {ts}")
                     plt.savefig(f"/opt/airflow/data/{conn_id}_per_command.png")
 
-    @task
+    @task()
     def send_picture(conn_id):
         import csv, requests
 #        if os.path.exists(f"/opt/airflow/data/{conn_id}.png") or os.path.exists(f"/opt/airflow/data/{conn_id}_per_command.png"):
@@ -193,7 +195,42 @@ with DAG(
                 try:
                     send = requests.post(message, files=files)
                 except Exception as e:
-                    print(str(e))
+                    logging.info(str(e))
+
+    @task()
+    def sshServer(conn_id, **context):
+        connection = BaseHook.get_connection(conn_id)
+        host=connection.host
+        username=connection.login
+        password=connection.password
+        port=connection.port
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh_client.connect(hostname=host, port=port,username=username, password=password)
+            stdin, stdout, stderr = ssh_client.exec_command("ps -eo time,pid,user,ppid,cmd,%mem,%cpu --sort=-%mem | head -n 4")
+            line = stdout.readlines()
+            return line
+        except paramiko.AuthenticationException as error:
+            logging.info(str(error))    
+            return None                    
+
+    @task()
+    def send_telegram(results, **context):
+        connection = BaseHook.get_connection("telegram")
+        token = connection.password
+        chat_id = connection.host
+        ts = context['data_interval_end'] + timedelta(hours=7)
+        run_time = datetime.strptime(ts.strftime("%Y-%m-%d %H:%M:%S"),"%Y-%m-%d %H:%M:%S")
+        highest = float(results[1].split()[5])
+        if highest >= 60 and datetime.combine(date.today(),time(4,45)) <= run_time <= datetime.combine(date.today(),time(5,15)):
+            text = f"Top 3 memory consumption on server 192.168.41.7 at {run_time}\n"
+            for line in results:
+                text += line
+            message = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text=Top 10 Memory Usage\n<pre>{text}</pre>&parse_mode=HTML"
+#            message = f"https://api.telegram.org/bot6227308181:AAFCn2EMtAJsAq5ocOp2B39jAjubbVLX2R4/sendMessage?chat_id=1012087010&text=<pre>{text}</pre>&parse_mode=HTML"
+            requests.post(message)
+
 
     @task(trigger_rule="none_failed")
     def delete_file(conn_id):
@@ -203,11 +240,14 @@ with DAG(
                     or item.endswith(f"{conn_id}_per_command.png") or item.endswith(f"{conn_id}_summary_per_command.csv"):
                 os.remove(os.path.join("/opt/airflow/data", item))
 
+
     databases = ['cboss-psn',
                  'cboss-mahaga', 'cboss-snt', 'cboss-snl', 'analysis']
     get_processlists = get_processlist.expand(conn_id=databases)
     get_summaries = get_summary.expand(conn_id=databases)
     send_pictures = send_picture.expand(conn_id=databases)
     delete_files = delete_file.expand(conn_id=databases)
+    telegram_notification = send_telegram(sshServer('ssh-analysis'))
 
     start >> get_processlists >> get_summaries >> send_pictures >> delete_files
+    start >> telegram_notification
